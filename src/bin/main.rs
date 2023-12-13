@@ -3,14 +3,15 @@ use std::{env, process};
 use log::{info, warn, error};
 use clap::{App, Arg};
 use ecdsa_manager::server::{SERVER_LOCK_TIME_OUT_DEFAULT, SERVER_TASK_GET_BACK_TIME_OUT_DEFAULT, SERVER_EXIT_TIME_OUT_AFTER_TASK_DONE_DEFAULT};
-use ecdsa_manager::utils;
+use ecdsa_manager::utils::{self, get_config};
 use ecdsa_manager::run::run;
 
 fn main() {
+    let config = get_config();
     let cmds = App::new("ecdsa-manager")
         .author("tester")
         .version("0.0.1")
-        .subcommands(vec![run_cmd(), stop_cmd()]);
+        .subcommands(vec![run_cmd(&config.port), stop_cmd()]);
     let mut _cmds = cmds.clone();
     let matches = cmds.get_matches();
 
@@ -44,11 +45,11 @@ fn main() {
     }
 }
 
-fn run_cmd() -> App<'static, 'static> {
+fn run_cmd<'b>(port: &'b str) -> App<'b, 'b> {
     App::new("run").about("run ecdsa-manager").args(&[
         Arg::from_usage("-d, --debug 'print debug log'").required(false),
         Arg::from_usage("-p, --port==[PORT] 'specify server port'")
-            .default_value("4500")
+            .default_value(port)
             .required(false),
     ])
 }

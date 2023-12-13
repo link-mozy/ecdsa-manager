@@ -3,16 +3,20 @@ use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 use std::sync::{Arc, Mutex, RwLock};
 use futures::FutureExt;
-use log::info;
+use log::{info, error};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot;
 use tonic::transport::Server;
 use tonic::{Response, Status, Request};
+use uuid::Uuid;
 
-use crate::common::Key;
+use crate::common::{Key, Config, call_agent_keygen, call_agents_keygen};
+use crate::ecdsa_agent_grpc::RunKeygenRequest;
+use crate::ecdsa_agent_grpc::ecdsa_agent_service_client::EcdsaAgentServiceClient;
 use crate::ecdsa_manager_grpc::{BaseResponse, SetRequest, GetRequest, EmptyRequest};
 use crate::ecdsa_manager_grpc::ecdsa_manager_service_server::{EcdsaManagerService, EcdsaManagerServiceServer};
 use crate::status::ServerStatus;
+use crate::utils::get_config;
 
 pub const SERVER_LOCK_TIME_OUT_DEFAULT: Duration = Duration::from_secs(10);
 pub const SERVER_TASK_GET_BACK_TIME_OUT_DEFAULT: Duration = Duration::from_secs(60);
@@ -145,7 +149,12 @@ impl EcdsaManagerService for EcdsaManagerServer {
         &self,
         request: Request<EmptyRequest>
     ) -> Result<Response<BaseResponse>, Status> {
-        let msg = format!("success");
+        let config: Config = get_config();
+        let uuid = Uuid::new_v4().to_string();
+        info!("keygen call. uuid: {}, parties: {}, threshold: {}", uuid, config.parties, config.threshold);
+        tokio::task::spawn(call_agents_keygen(uuid.clone(), config.info_agents));
+        
+        let msg = format!("keygen call!");
         Ok(Response::new(BaseResponse { msg: msg.to_string() }))
     }
 }

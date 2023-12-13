@@ -1,0 +1,10 @@
+port: 4500
+parties: 3
+threshold: 1
+info_agents:
+  - party_num: 1
+    url: 127.0.0.1:4501
+  - party_num: 2
+    url: 127.0.0.1:4502
+  - party_num: 3
+    url: 127.0.0.1:4503

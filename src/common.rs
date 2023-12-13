@@ -15,6 +15,9 @@ use curv::{
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
+use crate::ecdsa_agent_grpc::RunKeygenRequest;
+use crate::ecdsa_agent_grpc::ecdsa_agent_service_client::EcdsaAgentServiceClient;
+
 pub type Key = String;
 
 #[allow(dead_code)]
@@ -47,6 +50,20 @@ pub struct Entry {
 pub struct Params {
     pub parties: String,
     pub threshold: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InfoAgent {
+    pub party_num: u32,
+    pub url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Config {
+    pub port: String,
+    pub parties: u32,
+    pub threshold: u32,
+    pub info_agents: Vec<InfoAgent>,
 }
 
 #[allow(dead_code)]
@@ -222,4 +239,31 @@ pub fn check_sig(
 
     let is_correct = SECP256K1.verify(&msg, &secp_sig, &pk).is_ok();
     assert!(is_correct);
+}
+
+pub async fn call_agents_keygen(uuid: String, info_agents: Vec<InfoAgent>) {
+    for (_idx, info_agent) in info_agents.iter().enumerate() {
+        // match call_agent_keygen(addr, &uuid, idx as u32 + 1).await {
+        //     Ok(_) => {
+        //         info!("agent({}) keygen call success", addr);
+        //         result += 1;
+        //     }
+        //     Err(e) => {
+        //         error!("call agent keygen with error: {}", e);
+        //     }
+        // }
+        let _ = call_agent_keygen(&uuid, &info_agent.url, info_agent.party_num).await;
+    }
+}
+
+pub async fn call_agent_keygen(uuid: &str, url: &str, party_num: u32) -> Result<(), Box<dyn std::error::Error>> {
+    // let mut clinet = EcdsaAgentServiceClient<tonic::transport::Channel>::connect(addr.to_string()).await?;
+    let clinet = EcdsaAgentServiceClient::connect(format!("http://{}", url)).await;
+    let request = tonic::Request::new(RunKeygenRequest {
+        uuid: uuid.to_string(),
+        party_number: party_num.to_string(),
+    });
+    let response = clinet?.run_keygen(request).await;
+    println!("response: {:?}", response);
+    Ok(())
 }

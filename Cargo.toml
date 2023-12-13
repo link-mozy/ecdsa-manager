@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "ecdsa-agent"
+name = "ecdsa-manager"
 path = "src/bin/main.rs"
 
 [features]
@@ -46,6 +46,7 @@ structopt = "0.3"
 secp256k1 = { version = "0.20", features = ["global-context"]}
 signal-hook = "0.3.17"
 dirs = "5.0.1"
+serde_yaml = "0.9.27"
 
 [dependencies.paillier]
 version = "0.4.2"
