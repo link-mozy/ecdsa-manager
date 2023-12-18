@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 use std::sync::{Arc, Mutex, RwLock};
 use futures::FutureExt;
 use log::{info, error};
+use serde_json::json;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot;
 use tonic::transport::Server;
@@ -133,8 +134,16 @@ impl EcdsaManagerService for EcdsaManagerServer {
         &self,
         request: Request<SetRequest>
     ) -> Result<Response<BaseResponse>, Status> {
-        let msg = format!("success");
-        Ok(Response::new(BaseResponse { msg: msg.to_string() }))
+        let req = request.into_inner();
+        let key = req.key;
+        let value = req.value;
+        let si = self.server_info.lock().unwrap();
+        let mut hm = si.storage.write().unwrap();
+        hm.insert(key.clone(), value.clone());
+
+        info!("set::request::key: {}", key);
+        info!("set::request::value: {}", value);
+        Ok(Response::new(BaseResponse { msg: json!({"status": "success", "value": value}).to_string() }))
     }
 
     async fn get(

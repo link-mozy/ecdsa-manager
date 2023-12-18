@@ -15,8 +15,9 @@ use curv::{
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
-use crate::ecdsa_agent_grpc::RunKeygenRequest;
+use crate::ecdsa_agent_grpc::{RunKeygenRequest, InfoAgent};
 use crate::ecdsa_agent_grpc::ecdsa_agent_service_client::EcdsaAgentServiceClient;
+use crate::utils::get_config;
 
 pub type Key = String;
 
@@ -53,7 +54,7 @@ pub struct Params {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct InfoAgent {
+pub struct ConfigInfoAgent {
     pub party_num: u32,
     pub url: String,
 }
@@ -63,7 +64,7 @@ pub struct Config {
     pub port: String,
     pub parties: u32,
     pub threshold: u32,
-    pub info_agents: Vec<InfoAgent>,
+    pub info_agents: Vec<ConfigInfoAgent>,
 }
 
 #[allow(dead_code)]
@@ -241,7 +242,7 @@ pub fn check_sig(
     assert!(is_correct);
 }
 
-pub async fn call_agents_keygen(uuid: String, info_agents: Vec<InfoAgent>) {
+pub async fn call_agents_keygen(uuid: String, info_agents: Vec<ConfigInfoAgent>) {
     for (_idx, info_agent) in info_agents.iter().enumerate() {
         // match call_agent_keygen(addr, &uuid, idx as u32 + 1).await {
         //     Ok(_) => {
@@ -257,11 +258,21 @@ pub async fn call_agents_keygen(uuid: String, info_agents: Vec<InfoAgent>) {
 }
 
 pub async fn call_agent_keygen(uuid: &str, url: &str, party_num: u32) -> Result<(), Box<dyn std::error::Error>> {
+    let config: Config = get_config();
+    let info_agents: Vec<InfoAgent> = config.info_agents.iter().map(|a| {
+        InfoAgent {
+            party_num: a.party_num.to_string(),
+            url: a.url.clone(),
+        }
+    }).collect();
     // let mut clinet = EcdsaAgentServiceClient<tonic::transport::Channel>::connect(addr.to_string()).await?;
     let clinet = EcdsaAgentServiceClient::connect(format!("http://{}", url)).await;
     let request = tonic::Request::new(RunKeygenRequest {
         uuid: uuid.to_string(),
         party_number: party_num.to_string(),
+        threshold: config.threshold.to_string(),
+        parties: config.parties.to_string(),
+        info_agents: info_agents,
     });
     let response = clinet?.run_keygen(request).await;
     println!("response: {:?}", response);
