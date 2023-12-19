@@ -150,8 +150,20 @@ impl EcdsaManagerService for EcdsaManagerServer {
         &self,
         request: Request<GetRequest>
     ) -> Result<Response<BaseResponse>, Status> {
-        let msg = format!("success");
-        Ok(Response::new(BaseResponse { msg: msg.to_string() }))
+        let req = request.into_inner();
+        let key = req.key;
+        let si = self.server_info.lock().unwrap();
+        let hm = si.storage.read().unwrap();
+        match hm.get(&key) {
+            Some(value) => {
+                let msg = json!({"status": "success", "value": value});
+                Ok(Response::new(BaseResponse { msg: msg.to_string() }))
+            }
+            None => {
+                let msg = json!({"status": "fail"});
+                Ok(Response::new(BaseResponse { msg: msg.to_string() }))
+            }
+        }
     }
 
     async fn keygen(
