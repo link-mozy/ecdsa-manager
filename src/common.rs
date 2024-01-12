@@ -1,9 +1,10 @@
 #![allow(dead_code)]
-
 use std::{env, thread, time, time::Duration};
+use futures::future;
 
 use aes_gcm::aead::{Aead, NewAead};
 use aes_gcm::{Aes256Gcm, Nonce};
+use log::info;
 use rand::{rngs::OsRng, RngCore};
 
 use curv::{
@@ -53,7 +54,7 @@ pub struct Params {
     pub threshold: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ConfigInfoAgent {
     pub party_num: u32,
     pub url: String,
@@ -242,22 +243,19 @@ pub fn check_sig(
     assert!(is_correct);
 }
 
-pub async fn call_agents_keygen(uuid: String, info_agents: Vec<ConfigInfoAgent>) {
-    for (_idx, info_agent) in info_agents.iter().enumerate() {
-        // match call_agent_keygen(addr, &uuid, idx as u32 + 1).await {
-        //     Ok(_) => {
-        //         info!("agent({}) keygen call success", addr);
-        //         result += 1;
-        //     }
-        //     Err(e) => {
-        //         error!("call agent keygen with error: {}", e);
-        //     }
-        // }
-        let _ = call_agent_keygen(&uuid, &info_agent.url, info_agent.party_num).await;
-    }
+pub fn call_agents_keygen(uuid: String, info_agents: Vec<ConfigInfoAgent>) {
+    let cloned_info_agents: Vec<_> = info_agents.iter().cloned().collect();
+    let clients: Vec<_> = cloned_info_agents.iter().map( |info_agent| {
+        let agent_url = info_agent.url.clone();
+        tokio::spawn(call_agent_keygen(uuid.clone(), agent_url, info_agent.party_num))
+    }).collect();
+
+    tokio::runtime::Runtime::new().unwrap().block_on(async {
+        let _ = future::try_join_all(clients);
+    });
 }
 
-pub async fn call_agent_keygen(uuid: &str, url: &str, party_num: u32) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn call_agent_keygen(uuid: String, url: String, party_num: u32) {
     let config: Config = get_config();
     let info_agents: Vec<InfoAgent> = config.info_agents.iter().map(|a| {
         InfoAgent {
@@ -265,16 +263,20 @@ pub async fn call_agent_keygen(uuid: &str, url: &str, party_num: u32) -> Result<
             url: a.url.clone(),
         }
     }).collect();
-    // let mut clinet = EcdsaAgentServiceClient<tonic::transport::Channel>::connect(addr.to_string()).await?;
-    let clinet = EcdsaAgentServiceClient::connect(format!("http://{}", url)).await;
+    let agent_url = Box::leak(format!("http://{}", url).into_boxed_str());
+    let my_channel = tonic::transport::Channel::from_static(agent_url)
+                                    .connect()
+                                    .await
+                                    .expect("Failed to connect to ecdsa-agent");
+    let mut client = EcdsaAgentServiceClient::new(my_channel);
     let request = tonic::Request::new(RunKeygenRequest {
         uuid: uuid.to_string(),
         party_number: party_num.to_string(),
         threshold: config.threshold.to_string(),
         parties: config.parties.to_string(),
-        info_agents: info_agents,
+        info_agents,
     });
-    let response = clinet?.run_keygen(request).await;
-    println!("response: {:?}", response);
-    Ok(())
+    let response = client.run_keygen(request).await;
+
+    info!("call_agent_keygen: {:?}", response);
 }
