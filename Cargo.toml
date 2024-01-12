@@ -47,6 +47,9 @@ secp256k1 = { version = "0.20", features = ["global-context"]}
 signal-hook = "0.3.17"
 dirs = "5.0.1"
 serde_yaml = "0.9.27"
+spmc = "0.3.0"
+futures-concurrency = "7.4.3"
+futures-lite = "2.1.0"
 
 [dependencies.paillier]
 version = "0.4.2"
