@@ -11,9 +11,7 @@ use tonic::transport::Server;
 use tonic::{Response, Status, Request};
 use uuid::Uuid;
 
-use crate::common::{Key, Config, call_agent_keygen, call_agents_keygen};
-use crate::ecdsa_agent_grpc::RunKeygenRequest;
-use crate::ecdsa_agent_grpc::ecdsa_agent_service_client::EcdsaAgentServiceClient;
+use crate::common::{Key, Config, call_agents_keygen};
 use crate::ecdsa_manager_grpc::{BaseResponse, SetRequest, GetRequest, EmptyRequest};
 use crate::ecdsa_manager_grpc::ecdsa_manager_service_server::{EcdsaManagerService, EcdsaManagerServiceServer};
 use crate::status::ServerStatus;
@@ -160,7 +158,7 @@ impl EcdsaManagerService for EcdsaManagerServer {
                 Ok(Response::new(BaseResponse { msg: msg.to_string() }))
             }
             None => {
-                let msg = json!({"status": "fail"});
+                let msg = json!({"status": "fail", "value": ""});
                 Ok(Response::new(BaseResponse { msg: msg.to_string() }))
             }
         }
@@ -173,7 +171,7 @@ impl EcdsaManagerService for EcdsaManagerServer {
         let config: Config = get_config();
         let uuid = Uuid::new_v4().to_string();
         info!("keygen call. uuid: {}, parties: {}, threshold: {}", uuid, config.parties, config.threshold);
-        tokio::task::spawn(call_agents_keygen(uuid.clone(), config.info_agents));
+        call_agents_keygen(uuid.clone(), config.info_agents);
         
         let msg = format!("keygen call!");
         Ok(Response::new(BaseResponse { msg: msg.to_string() }))
